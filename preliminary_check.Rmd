@@ -41,11 +41,21 @@ To avoid abnormalities in data and potential obstacles in the process of predict
 library(pastecs)
 description <- bitrade %>%
   select(-year, -country_code_o, -country_code_d, -iso_o, -iso_d, -country_o, -country_d, -comlang, -contig, -OECD_o, -GATT_o, -OECD_d, -GATT_d) 
-desp <- stat.desc(description, basic=F)
-knitr::kable(desp) 
+knitr::kable(summary(description))
 ```
 
-Second, I took the log of trade value, GDP, distance and population to achieve a smoother distribution of the data. 
+Second, I take the log of trade value, GDP, distance and population to achieve a smoother distribution of the data.
+```{r summarystats2, echo=FALSE}
+library(pastecs)
+desp1 <- description %>%
+   mutate(lflow = log(FLOW), lgdp_o = log(GDP_o), lgdp_d = log(GDP_d), lpop_o = log(pop_o),      lpop_d = log(pop_d), ldistw = log(distw)) %>%
+   select(-FLOW, -GDP_o, -GDP_d, -pop_o, -pop_d, -distw)
+desp <- stat.desc(desp1, basic=F)
+knitr::kable(desp)
+
+rm(desp1, description, desp)
+```
+
 ```{r histogram, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
 par(mfrow=c(2,3))
 hist(log(bitrade$FLOW),
