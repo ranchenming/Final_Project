@@ -151,7 +151,7 @@ library(grid)
 img2<- readJPEG("equation.jpg")
 grid.raster(img2)
 ```
-To this baseline specification, other control features discussed above, including population, share of language, contiguity, OECD, GATT. For model estimation, I test the model using three different Machine Learning (ML) techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm. I investigate the performance of the linear time-series model against the other ML models.
+Control features are discussed above and were used by by Circlaeys et al. (2017), including population, share of language, contiguity, OECD, GATT are also. For model estimation, I test the model using three different Machine Learning (ML) techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm, in order to compare the performance of the linear time-series model against the other ML models.
 
 ## Reference
 
