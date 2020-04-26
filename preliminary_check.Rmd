@@ -21,11 +21,12 @@ library(haven)
 In general, a gravity model assumes that the volume of trade between any two economies will be directly proportional to the product of their economic masses that are commonly measured by GDP or GNP. For predicting aggregate bilateral trade, the aggregate GDP value is the suitable proxy in term of cross-country time-series data. While Circlaeys et al.(2017) used  nominal GDP, this study uses trade quantity and real GDP for estimation, which is universally recognized as a more accurate measure of production output 
 
 Although “Tradhist” from Centre d'Etudes Prospectives et d'Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017), the data is only available up to the year 2014. Different from Circlaeys et al. (2017) analyzing bilateral trade flow from 2009 to 2014, I analyze bilateral trade from 1995 to 2018, so key indicators of Bilateral trade flow and GDP will be recreated and updated. Time-invariant indicators, including weighted distances and other control variables, will be adopted from "Tradehist".
-```{r variable selection, fig.align="center", echo=FALSE}
-knitr::include_graphics("features.jpg")
+```{r variable selection, fig.align="center",fig.width= 6, fig.height= 3, echo=FALSE}
+library(jpeg)
+library(grid)
+img <- readJPEG("features.jpg")
+ grid.raster(img)
 ```
-
-
 Therefore, this study obtained a dataset contains 605 thousand data points from the 1995 to 2014 for 226 different countries and territories. Our data set has both geographical dimension (country-pairs, such as USA to China, France to Germany, etc.) and time dimension. 
 ```{r data, include=FALSE}
 new_bitrade <- read_dta("new_bitrade.dta")
@@ -34,7 +35,7 @@ bitrade <- new_bitrade  %>%
 ```
 
 To avoid abnormalities in data and potential obstacles in the process of prediction, first I remove incomplete data from the data set, which means data points that have missing feature values. 
-```{r summary stats, echo=FALSE}
+```{r summarystats, echo=FALSE}
 library(pastecs)
 description <- bitrade %>%
   select(-year, -country_code_o, -country_code_d, -iso_o, -iso_d, -country_o, -country_d, -comlang, -contig, -OECD_o, -GATT_o, -OECD_d, -GATT_d) 
@@ -101,15 +102,54 @@ curve(dnorm(x, mean=mean(log(bitrade$distw)), sd=sd(log(bitrade$distw))), add=TR
 
 ```
 
-## Emprical Model
-
-As discussed above, Gravity Model describes the interactions among the GDPs and distance in a functional form inspired by Newton’s law of universal gravitation. The change of Bilateral Trade Flow is quite persistent over time, I investigate the performance of time series models against the other proposed models. Therefore, a traditional time series model including one lag of trade flow will be tested. The equation shows as below:
-
-```{r task_A1_2, echo=FALSE}
-knitr::include_graphics("equation.jpg")
+There are some heterogenieties of bilateral trade flow over time, whereas most of the changes are persistent. 
+```{r lineplot, fig.align="center", echo=FALSE, message=FALSE, warning=FALSE}
+library(ggplot2)
+bitrade$year =  as.Date(bitrade$year, "%Y")
+line <- bitrade %>%
+  group_by(year) %>%
+  summarize(trade_value = mean(FLOW)) 
+  
+ggplot(line, aes(x=year, y=trade_value/1000000, group = 1)) +
+  geom_line(color="black") +
+  xlab("Year") +
+  ylab("Average $ Billion")+
+  ggtitle("Bilateral Trade Flow") +
+  theme_minimal() +
+  theme_classic() +
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.5)) 
 ```
 
-To this baseline specification, other control features discussed above, including population, share of language, contiguity, OECD, GATT. For model estimation, I test the model using three different Machine Learning techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm.
+## Autocorrelation and Partial-Autocorrelation
+
+First, a  Augmented Dickey-Fuller Test (adf test) is used to test if the data is stationary. A p-Value of less than 0.05 indicates that the bilateral trade flow is stationary.
+```{r stationary}
+library(tseries)
+adf.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
+kpss.test(bitrade$FLOW)
+```
+
+
+The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. However, for the partial autocrrelation, the graph shows that the correlation of the time series with a lag of itself is quite signficant. For empirical analysis, I include on lage of bilateral trade flow for investigating the performance of time series models against the other proposed models.
+```{r PA, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
+library(Hmisc)
+bitrade$flow_1<- Lag(bitrade$FLOW, -1)
+acfRes <- acf(bitrade$FLOW, plot = FALSE) # autocorrelation
+plot(acfRes, main = "Bilateral Trade Flow Time Series ACF")
+pacfRes <- pacf(bitrade$FLOW, plot = FALSE)  # partial autocorrelation
+plot(pacfRes, main = "Bilateral Trade Flow Time Series Partial ACF")
+```
+
+## Emprical Model
+
+As discussed above, Gravity Model describes the interactions among the GDPs and distance in a functional form inspired by Newton’s law of universal gravitation. Becuase, the change of bilateral trade flow is almost persistent over time, a traditional time series model including one lag of trade flow will be tested. The equation shows as below:
+```{r formula, fig.align="center", fig.width= 6, fig.height= 0.5, echo=FALSE}
+library(jpeg)
+library(grid)
+img2<- readJPEG("equation.jpg")
+grid.raster(img2)
+```
+To this baseline specification, other control features discussed above, including population, share of language, contiguity, OECD, GATT. For model estimation, I test the model using three different Machine Learning (ML) techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm. I investigate the performance of the linear time-series model against the other ML models.
 
 ## Reference
 
