@@ -21,7 +21,7 @@ library(haven)
 In general, a gravity model assumes that the volume of trade between any two economies will be directly proportional to the product of their economic masses that are commonly measured by GDP or GNP. For predicting aggregate bilateral trade, the aggregate GDP value is the suitable proxy in term of cross-country time-series data. While Circlaeys et al.(2017) used  nominal GDP, this study uses trade quantity and real GDP for estimation, which is universally recognized as a more accurate measure of production output 
 
 Although “Tradhist” from Centre d'Etudes Prospectives et d'Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017), the data is only available up to the year 2014. Different from Circlaeys et al. (2017) analyzing bilateral trade flow from 2009 to 2014, I analyze bilateral trade from 1995 to 2018, so key indicators of Bilateral trade flow and GDP will be recreated and updated. Time-invariant indicators, including weighted distances and other control variables, will be adopted from "Tradehist".
-```{r variable selection, fig.align="center",fig.width= 6, fig.height= 3, echo=FALSE}
+```{r variable selection, fig.align="center", fig.width= 6, fig.height= 3, echo=FALSE}
 library(jpeg)
 library(grid)
 img <- readJPEG("features.jpg")
@@ -32,6 +32,8 @@ Therefore, this study obtained a dataset contains 605 thousand data points from 
 new_bitrade <- read_dta("new_bitrade.dta")
 bitrade <- new_bitrade  %>%
   filter(!is.na(GDP_o),!is.na(GDP_d), !is.na(pop_o), !is.na(pop_d), !is.na(distw)) 
+
+rm(new_bitrade)
 ```
 
 To avoid abnormalities in data and potential obstacles in the process of prediction, first I remove incomplete data from the data set, which means data points that have missing feature values. 
@@ -131,7 +133,7 @@ kpss.test(bitrade$FLOW)
 
 
 The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. However, for the partial autocrrelation, the graph shows that the correlation of the time series with a lag of itself is quite signficant. For empirical analysis, I include on lage of bilateral trade flow for investigating the performance of time series models against the other proposed models.
-```{r PA, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
+```{r PA, fig.align="center",fig.width= 6, fig.height= 4, echo=FALSE, message=FALSE, warning=FALSE}
 library(Hmisc)
 bitrade$flow_1<- Lag(bitrade$FLOW, -1)
 acfRes <- acf(bitrade$FLOW, plot = FALSE) # autocorrelation
