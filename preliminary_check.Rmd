@@ -1,0 +1,116 @@
+---
+title: "Preliminary Check"
+author: "Chenming Ran"
+date: "4/26/2020"
+output: html_document
+---
+
+```{r set_up, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r package, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(haven)
+```
+
+
+## Data Description
+
+In general, a gravity model assumes that the volume of trade between any two economies will be directly proportional to the product of their economic masses that are commonly measured by GDP or GNP. For predicting aggregate bilateral trade, the aggregate GDP value is the suitable proxy in term of cross-country time-series data. While Circlaeys et al.(2017) used  nominal GDP, this study uses trade quantity and real GDP for estimation, which is universally recognized as a more accurate measure of production output 
+
+Although “Tradhist” from Centre d'Etudes Prospectives et d'Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017), the data is only available up to the year 2014. Different from Circlaeys et al. (2017) analyzing bilateral trade flow from 2009 to 2014, I analyze bilateral trade from 1995 to 2018, so key indicators of Bilateral trade flow and GDP will be recreated and updated. Time-invariant indicators, including weighted distances and other control variables, will be adopted from "Tradehist".
+```{r variable selection, fig.align="center", echo=FALSE}
+knitr::include_graphics("features.jpg")
+```
+
+
+Therefore, this study obtained a dataset contains 605 thousand data points from the 1995 to 2014 for 226 different countries and territories. Our data set has both geographical dimension (country-pairs, such as USA to China, France to Germany, etc.) and time dimension. 
+```{r data, include=FALSE}
+new_bitrade <- read_dta("new_bitrade.dta")
+bitrade <- new_bitrade  %>%
+  filter(!is.na(GDP_o),!is.na(GDP_d), !is.na(pop_o), !is.na(pop_d), !is.na(distw)) 
+```
+
+To avoid abnormalities in data and potential obstacles in the process of prediction, first I remove incomplete data from the data set, which means data points that have missing feature values. 
+```{r summary stats, echo=FALSE}
+library(pastecs)
+description <- bitrade %>%
+  select(-year, -country_code_o, -country_code_d, -iso_o, -iso_d, -country_o, -country_d, -comlang, -contig, -OECD_o, -GATT_o, -OECD_d, -GATT_d) 
+desp <- stat.desc(description, basic=F)
+knitr::kable(desp) 
+```
+
+Second, I took the log of trade value, GDP, distance and population to achieve a smoother distribution of the data. 
+```{r histogram, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,3))
+hist(log(bitrade$FLOW),
+     main="Bilateral Trade Flow",
+     freq = FALSE,
+     xlab="Trade Value($); logged",
+     xlim=c(5,30),
+     ylim=c(0.00, 0.12),
+     col="darkblue")
+x<-seq(5,30, by = 5)
+curve(dnorm(x, mean=mean(log(bitrade$FLOW)), sd=sd(log(bitrade$FLOW))), add=TRUE)
+hist(log(bitrade$GDP_o),
+     main="GDP of Origin Countries",
+     freq = FALSE,
+     xlab="U.S $; logged",
+     xlim=c(15,30),
+     ylim=c(0.00, 0.20),
+     col="purple")
+x<-seq(15,30, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$GDP_o)), sd=sd(log(bitrade$GDP_o))), add=TRUE)
+hist(log(bitrade$GDP_d),
+     main="GDP of Destination Countries",
+     freq = FALSE,
+     xlab="U.S $; logged",
+     xlim=c(15,30),
+     ylim=c(0.00, 0.20),
+     col="purple")
+x<-seq(15,30, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$GDP_d)), sd=sd(log(bitrade$GDP_d))), add=TRUE)
+hist(log(bitrade$pop_o),
+     main="Population of Origin Countries",
+     freq = FALSE,
+     xlab="No. of People; logged",
+     xlim=c(5,25),
+     ylim=c(0.00, 0.20),
+     col="brown")
+x<-seq(15,30, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$pop_o)), sd=sd(log(bitrade$pop_o))), add=TRUE)
+hist(log(bitrade$pop_d),
+     main="Population of Destination Countries",
+     freq = FALSE,
+     xlab="No. of People; logged",
+     xlim=c(5,25),
+     ylim=c(0.00, 0.20),
+     col="brown")
+x<-seq(15,30, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$pop_d)), sd=sd(log(bitrade$pop_d))), add=TRUE)
+hist(log(bitrade$distw),
+     main="Weighted Distance",
+     freq = FALSE,
+     xlab="kilometer; logged",
+     xlim=c(5,11),
+     col="darkgreen")
+x<-seq(15,30, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$distw)), sd=sd(log(bitrade$distw))), add=TRUE)
+
+```
+
+## Emprical Model
+
+As discussed above, Gravity Model describes the interactions among the GDPs and distance in a functional form inspired by Newton’s law of universal gravitation. The change of Bilateral Trade Flow is quite persistent over time, I investigate the performance of time series models against the other proposed models. Therefore, a traditional time series model including one lag of trade flow will be tested. The equation shows as below:
+
+```{r task_A1_2, echo=FALSE}
+knitr::include_graphics("equation.jpg")
+```
+
+To this baseline specification, other control features discussed above, including population, share of language, contiguity, OECD, GATT. For model estimation, I test the model using three different Machine Learning techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm.
+
+## Reference
+
+[1] S. Circlaeys, C. Kanitkar, and D. Kumazawa, “Bilateral Trade Flow Prediction”, available at: http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf, 2017 
