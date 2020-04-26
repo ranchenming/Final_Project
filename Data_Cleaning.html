@@ -1642,8 +1642,8 @@ summary {
 
 <p>In general, a gravity model assumes that the volume of trade between any two economies will be directly proportional to the product of their economic masses that are commonly measured by GDP or GNP. For predicting aggregate bilateral trade, the aggregate GDP value is the suitable proxy in term of cross-country time-series data. While Circlaeys et al.(2017) used nominal GDP, this study uses trade quantity and real GDP for estimation, which is universally recognized as a more accurate measure of production output</p>
 <p>Although “Tradhist” from Centre d’Etudes Prospectives et d’Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017), the data is only available up to the year 2014. Different from Circlaeys et al. (2017) analyzing bilateral trade flow from 2009 to 2014, I analyze bilateral trade from 1995 to 2018, so key indicators of Bilateral trade flow and GDP will be recreated and updated. Time-invariant indicators, including weighted distances and other control variables, will be adopted from “Tradehist”.</p>
-<div id="bilateral-trade-quantity" class="section level1">
-<h1>Bilateral Trade Quantity</h1>
+<div id="bilateral-trade-values" class="section level1">
+<h1>Bilateral Trade Values</h1>
 <p>Other than “Tradehist”, BACI&quot; is the major bilateral trade database provided by CEPII. This database provides yearly data on bilateral trade flows at the product level. Products are identified using the Harmonized System (HS), a standard nomenclature for international trade, Ths HS was revised in 1992, 1996, 2002, 2007, 2012 and 2017. For this study, I use HS92 version that has data vailable from 1995 to 2018, the bilateral trade value is obtained by country and year.</p>
 <p>Due to the extremely large data volume, I first append all HS92 country data from 1995 to 2007.</p>
 <pre class="r"><code>library(foreign)
@@ -1831,6 +1831,16 @@ rm(binvar, cinvar, invar, invar_1, ci_1, ci_2)</code></pre>
 write_dta(new_bitrade, &quot;new_bitrade.dta&quot;)
 
 rm(tinvar, New_Trade_Data)</code></pre>
+<div id="reference" class="section level2">
+<h2>Reference</h2>
+<p>[1] G.Gaulier and S. Zignago, “International Trade Database at the Product-Level.” CEPII Working Paper, 2010.</p>
+<p>[2] M. Fouquin and J. Hugot, “Two centuries of bilateral trade and gravity data: 1827-2014.” CEPII Working Paper, 2016.</p>
+<p>[3] S. Circlaeys, C. Kanitkar, and D. Kumazawa, “Bilateral Trade Flow Prediction”, available at: <a href="http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf" class="uri">http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf</a>, 2017</p>
+<p>[4] T. Mayer and S. Zignago, “Notes on CEPII’s distances measures : the GeoDist Database.” CEPII Working Paper, 2011.</p>
+<p>[5] “United Nations Population Division. World Population Prospects: Total Population” World Bank Database, available at: <a href="https://data.worldbank.org/indicator/sp.pop.totl" class="uri">https://data.worldbank.org/indicator/sp.pop.totl</a>, 2019</p>
+<p>[6] “World Development Indicators: GDP (current US$)” The World Bank Group, available at: <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" class="uri">https://data.worldbank.org/indicator/NY.GDP.MKTP.CD</a>, 2019</p>
+<p>[7] “World Bank National Account Data: Inflation, GDP deflator (annual %)” The World Bank Group, available at: <a href="https://data.worldbank.org/indicator/NY.GDP.DEFL.KD.ZG" class="uri">https://data.worldbank.org/indicator/NY.GDP.DEFL.KD.ZG</a>, 2019</p>
+</div>
 </div>
 
 
