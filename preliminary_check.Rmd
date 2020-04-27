@@ -35,7 +35,6 @@ bitrade <- new_bitrade  %>%
 
 rm(new_bitrade)
 ```
-
 To avoid abnormalities in data and potential obstacles in the process of prediction, first I remove incomplete data from the data set, which means data points that have missing feature values. 
 ```{r summarystats, echo=FALSE}
 library(pastecs)
@@ -44,7 +43,7 @@ description <- bitrade %>%
 knitr::kable(summary(description))
 ```
 
-Second, I take the log of trade value, GDP, distance and population to achieve a smoother distribution of the data.
+Second, I take the log of trade value, GDP, distance and population to achieve a smoother distribution of the data. The distribution is approximately normal which fits the assumptions of linear regression and K-Nearest Neighbors. CART analysis does not assume a particular form of relationship between the independent and dependent variables, but variables still need to be logatrithsms so to avoid bias when comparing RMSEs.
 ```{r summarystats2, echo=FALSE}
 library(pastecs)
 desp1 <- description %>%
@@ -114,7 +113,7 @@ curve(dnorm(x, mean=mean(log(bitrade$distw)), sd=sd(log(bitrade$distw))), add=TR
 
 ```
 
-There are some heterogenieties of bilateral trade flow over time, whereas most of the changes are persistent. 
+The graph shows that there are some heterogenieties of bilateral trade flow over time, whereas most of the changes are persistent. Therefore, in the next section, I apply autocorrelation and partial-autocorrelation to test whether lagged variable is needed for performing time-series effect.
 ```{r lineplot, fig.align="center", echo=FALSE, message=FALSE, warning=FALSE}
 library(ggplot2)
 bitrade$year =  as.Date(bitrade$year, "%Y")
@@ -141,7 +140,6 @@ adf.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
 kpss.test(bitrade$FLOW)
 ```
 
-
 The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. However, for the partial autocrrelation, the graph shows that the correlation of the time series with a lag of itself is quite signficant. For empirical analysis, I include on lage of bilateral trade flow for investigating the performance of time series models against the other proposed models.
 ```{r PA, fig.align="center",fig.width= 6, fig.height= 4, echo=FALSE, message=FALSE, warning=FALSE}
 library(Hmisc)
@@ -162,6 +160,18 @@ img2<- readJPEG("equation.jpg")
 grid.raster(img2)
 ```
 Control features are discussed above and were used by by Circlaeys et al. (2017), including population, share of language, contiguity, OECD, GATT are also. For model estimation, I test the model using three different Machine Learning (ML) techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm, in order to compare the performance of the linear time-series model against the other ML models.
+
+##  Comparison Metrics and Validation Method
+
+Following Circlaeys et al.(2017), R-squared is used as the main metric to compare the predictive performances of our models, which is commonly used as a measure for goodness of fit. I also show Root Mean Square Error (RMSE), another comparison metric, to demonstrate the quality of fit.
+
+According to Circlaeys et al.(2017), since I have enough data, I can conduct a hold-out validation using 30% of the entire data set. This means to separate the data set into a training set and a test set instead of conducting k-fold validation. The original data set is separated into the train set of 346,094 examples (70%) and test set of 148,326 examples (30%). 
+```{r splitting and k-fold cross validation}
+set.seed(20200302)
+split <- initial_split(data = bitrade, prop = 0.7)
+bit_training <- training(split)
+bit_testing <- testing(split)
+```
 
 ## Reference
 
