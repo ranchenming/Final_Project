@@ -1,0 +1,209 @@
+---
+title: "Predicting Bilateral Trade: Gravity Model V.S. Machine Learning"
+author: "Chenming Ran"
+date: "4/26/2020"
+output: html_document
+---
+
+```{r set_up, include=FALSE}
+knitr::opts_chunk$set(message = FALSE, warning = FALSE)
+```
+
+```{r package, message=FALSE, warning=FALSE, include=FALSE}
+library(tidyverse)
+library(tidymodels)
+library(haven)
+library(Hmisc)
+library(pastecs)
+```
+
+## Data Description
+
+In general, a gravity model assumes that the volume of trade between any two economies will be directly proportional to the product of their economic masses that are commonly measured by GDP or GNP. For predicting aggregate bilateral trade, the aggregate GDP value is the suitable proxy in term of cross-country time-series data. While Circlaeys et al.(2017) used  nominal GDP, this study uses trade quantity and real GDP for estimation, which is universally recognized as a more accurate measure of production output 
+
+Although “Tradhist” from Centre d'Etudes Prospectives et d'Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017), the data is only available up to the year 2014. Different from Circlaeys et al. (2017) analyzing bilateral trade flow from 2009 to 2014, I analyze bilateral trade from 1995 to 2018, so key indicators of Bilateral trade flow and GDP will be recreated and updated. Time-invariant indicators, including weighted distances and other control variables, will be adopted from "Tradehist".
+```{r variable selection, fig.align="center", fig.width= 6, fig.height= 3, echo=FALSE}
+library(jpeg)
+library(grid)
+img <- readJPEG("features.jpg")
+ grid.raster(img)
+```
+Therefore, this study obtained a dataset contains 605 thousand data points from the 1995 to 2014 for 226 different countries and territories. Our data set has both geographical dimension (country-pairs, such as USA to China, France to Germany, etc.) and time dimension. 
+```{r data, include=FALSE}
+new_bitrade <- read_dta("new_bitrade.dta")
+bitrade <- new_bitrade  %>%
+  filter(!is.na(GDP_o),!is.na(GDP_d), !is.na(pop_o), !is.na(pop_d), !is.na(distw)) 
+
+rm(new_bitrade)
+```
+To avoid abnormalities in data and potential obstacles in the process of prediction, first I remove incomplete data from the data set, which means data points that have missing feature values. 
+```{r summarystats, echo=FALSE}
+description <- bitrade %>%
+  select(-year, -country_code_o, -country_code_d, -iso_o, -iso_d, -country_o, -country_d, -comlang, -contig, -OECD_o, -GATT_o, -OECD_d, -GATT_d) 
+knitr::kable(summary(description))
+```
+
+Second, I take the log of trade value,e a smoother distribution of the data. All independent variables are standardized to fit the assumptions of linear regression and K-Nearest Neighbors. CART analysis does not assume a particular form of relationship between the independent and dependent variables, but variables still need to be normalized so to avoid bias when comparing metrics.
+```{r summarystats2, echo=FALSE}
+desp1 <- description %>%
+   mutate(lflow = log(FLOW), lgdp_o = log(GDP_o), lgdp_d = log(GDP_d), lpop_o = log(pop_o),      lpop_d = log(pop_d), ldistw = log(distw)) %>%
+   select(-FLOW, -GDP_o, -GDP_d, -pop_o, -pop_d, -distw)
+desp <- stat.desc(desp1, basic=F)
+knitr::kable(desp)
+
+rm(desp1, description, desp)
+```
+
+```{r histogram, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
+hist(log(bitrade$FLOW),
+     main="Bilateral Trade Flow",
+     freq = FALSE,
+     xlab="Trade Value($); logged",
+     xlim=c(5,30),
+     ylim=c(0.00, 0.12),
+     col="darkblue")
+x<-seq(5,30, by = 5)
+curve(dnorm(x, mean=mean(log(bitrade$FLOW)), sd=sd(log(bitrade$FLOW))), add=TRUE)
+```
+
+The graph shows that there are some heterogenieties of bilateral trade flow over time, whereas most of the changes are persistent. Therefore, in the next section, I apply autocorrelation and partial-autocorrelation to test whether lagged variable is needed for performing time-series effect.
+```{r lineplot, fig.align="center", echo=FALSE, message=FALSE, warning=FALSE}
+bitrade$year =  as.Date(bitrade$year, "%Y")
+line <- bitrade %>%
+  group_by(year) %>%
+  dplyr::summarize(trade_value = mean(FLOW)) 
+  
+ggplot(line, aes(x=year, y=trade_value/1000000, group = 1)) +
+  geom_line(color="black") +
+  xlab("Year") +
+  ylab("Average $ Billion")+
+  ggtitle("Bilateral Trade Flow") +
+  theme_minimal() +
+  theme_classic() +
+  theme(legend.position = "right", plot.title = element_text(hjust = 0.5)) 
+
+rm(line)
+```
+
+### Autocorrelation and Partial-Autocorrelation
+
+First, Augmented Dickey-Fuller Test (ADF test) and Kwiatkowski–Phillips–Schmidt–Shin (KPSS test) are used to test if the data is stationary. For both tests, a p-Value of less than 0.05 indicates that the bilateral trade flow is stationary.
+```{r stationary, echo=FALSE}
+library(tseries)
+adf.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
+kpss.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
+```
+
+The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. However, for the partial autocrrelation, the graph shows that the correlation of the time series with a lag of itself is quite signficant. For empirical analysis, I include on lage of bilateral trade flow for investigating the performance of time series models against the other proposed models.
+```{r PA, echo=FALSE, fig.align="center", fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
+library(Hmisc)
+acfRes <- acf(bitrade$FLOW, plot = FALSE) # autocorrelation
+plot(acfRes, main = "Bilateral Trade Flow Time Series ACF")
+pacfRes <- pacf(bitrade$FLOW, plot = FALSE)  # partial autocorrelation
+plot(pacfRes, main = "Bilateral Trade Flow Time Series Partial ACF")
+
+rm(acfRes, pacfRes, x)
+```
+
+## Emprical Model
+
+As discussed above, Gravity Model describes the interactions among the GDPs and distance in a functional form inspired by Newton’s law of universal gravitation. Becuase, the change of bilateral trade flow is almost persistent over time, a traditional time series model including one lag of trade flow will be tested. The equation shows as below:
+```{r formula, fig.align="center", fig.width= 6, fig.height= 0.5, echo=FALSE}
+library(jpeg)
+library(grid)
+img2<- readJPEG("equation.jpg")
+grid.raster(img2)
+```
+
+Control features are discussed above and were used by by Circlaeys et al. (2017), including population, share of language, contiguity, OECD, GATT are also. For model estimation, I test the model using three different Machine Learning (ML) techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm, in order to compare the performance of the linear time-series model against the other ML models.
+
+##  Comparison Metrics and Validation Method
+
+Following Circlaeys et al.(2017), R-squared is used as the main metric to compare the predictive performances of our models, which is commonly used as a measure for goodness of fit. RMSE and MAE are also included for evaluation.
+
+According to Circlaeys et al.(2017), since I have enough data, I can conduct a hold-out validation using 30% of the entire data set. This means to separate the data set into a training set and a test set instead of conducting k-fold validation. The original data set is separated into the train set of 346,094 examples (70%) and test set of 148,326 examples (30%). 
+```{r splitting training and testing data}
+set.seed(20200302)
+split <- initial_split(data = bitrade, prop = 0.7)
+bit_training <- training(split)
+bit_testing <- testing(split)
+```
+
+
+```{r train models}
+#create a recipe for preprocessing the data: standardization
+recipe1 <-
+   recipe(formula = FLOW ~ ., data = bit_training) %>%
+   step_lag(FLOW, lag = 1, default = NA) %>%
+   step_naomit(lag_1_FLOW) %>%   # delete 1 obeservation due to NA in lagged variable
+   step_rm(year, country_code_o, country_code_d, iso_o, iso_d, country_o, country_d) %>%
+   step_normalize(all_predictors()) %>%
+   step_log(FLOW) %>%
+   prep()
+
+# train linear regression model 
+lm_model <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(formula = FLOW ~., data = bake(recipe1, new_data = bit_training))
+
+# train CART regression model
+cart_model <-
+  decision_tree(mode = "regression") %>%
+  set_engine("rpart") %>%
+  fit(formula = FLOW ~., data = bake(recipe1, new_data = bit_training))
+
+# train KNN regression model
+#In general practice, choosing the value of k is k = sqrt(N) where N stands for the number of samples in your training dataset.
+knn_model <- nearest_neighbor(mode = "regression",
+                              neighbors = 588) %>%
+  set_engine(engine = "kknn") %>%
+  fit(formula = FLOW ~., data = bake(recipe1, new_data = bit_training))
+
+saveRDS(knn_model, "model_knn.rds", compress = FALSE)
+````
+
+```{r estimate the out of sample error, echo=TRUE}
+#Estimate the out-of-sample error rate by predicting values in the testing data set.
+Metric1 <- bind_cols(
+  bake(recipe1, new_data = bit_testing),
+  predict(lm_model, bake(recipe1, new_data = bit_testing))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (LM_model = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+#Estimate the out-of-sample error rate by predicting values in the testing data set.
+Metric2 <- bind_cols(
+  bake(recipe1, new_data = bit_testing),
+  predict(cart_model, bake(recipe1, new_data = bit_testing))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (CART_model = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+#Estimate the out-of-sample error rate by predicting values in the testing data set.
+Metric3 <- bind_cols(
+  bake(recipe1, new_data = bit_testing),
+  predict(knn_model, bake(recipe1, new_data = bit_testing))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (KNN_model = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+write_csv(Metric3, "Metric3.csv")
+````
+
+```{r print the out-of-sample errors, echo=TRUE}
+Metrics_p <- left_join(x = Metric1, y = Metric2, by = "metric") 
+Metrics_d <- left_join(x= Metrics_p, y = Metric3, by = "metric")
+Metrics <- as.data.frame(t(Metrics_d)) 
+Metrics <- data.frame(row.names(Metrics), Metrics, row.names = NULL) #change index into column
+names(Metrics) = as.character(unlist(Metrics[1,])) #change first row into column names
+Metrics <- Metrics[-1,] %>%
+   rename(Model = metric, RMSE = rmse, Rsquared = rsq, MAE = mae) 
+rownames(Metrics) <- NULL
+knitr::kable(Metrics)
+
+rm(Metrics_p, Metrics_d, Metric1, Metric2, Metric3)
+```
+
+## Reference
+
+[1] S. Circlaeys, C. Kanitkar, and D. Kumazawa, “Bilateral Trade Flow Prediction”, available at: http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf, 2017 
