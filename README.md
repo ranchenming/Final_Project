@@ -1,1 +1,1 @@
-# This Project Analyzes Bilateral Trade Flow Using Machine Learning Techniques
+Predicting Bilateral Trade: Gravity Model V.S. Machine Learning
