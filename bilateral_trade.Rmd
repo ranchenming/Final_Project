@@ -104,7 +104,6 @@ library(jpeg)
 library(grid) 
 img1<- readJPEG("equation1.jpg")
 grid.raster(img1)
-
 ```
 Continuous variables, including trade flow, GDP, weighted distance and population, are transformed into logathrithms. This helps to achieve a smoother distribution of the data that fits the assumption of linear regression, which is traditional method to addresss non-linearity. Control features used by by Circlaeys et al. (2017), including population, share of language, contiguity, OECD, GATT are also included in the model.
 
@@ -285,6 +284,8 @@ lm_AR_model <- linear_reg() %>%
 #train random forest model
 rf_model <- rand_forest(mode = "regression", mtry = 3, trees = 1000) %>%
   set_engine("ranger") %>%
+  fit(FLOW ~., data = bake(recipe1, new_data = bit_training))rf_model <- rand_forest(mode = "regression", mtry = 3, trees = 1000) %>%
+  set_engine("ranger") %>%
   fit(FLOW ~., data = bake(recipe1, new_data = bit_training))
   
 # train the KNN regression model
@@ -373,17 +374,18 @@ write_csv(Metric4, "Metric4.csv")
 
 ```{r print the in-sample errors, echo=FALSE}
 M_p <- left_join(x = M1, y = M2, by = "metric") 
-M_d <- left_join(x= M_p, y = Metric3, by = "metric")
-M_e <- left_join(x= M_d, y = Metric4, by = "metric")
+M_d <- left_join(x= M_p, y = M3, by = "metric")
+M_e <- left_join(x= M_d, y = M4, by = "metric")
 M <- as.data.frame(t(M_e)) 
 M <- data.frame(row.names(M), M, row.names = NULL) #change index into column
 names(M) = as.character(unlist(M[1,])) #change first row into column names
 M <- M[-1,] %>%
    rename(Model = metric, RMSE_train = rmse, Rsquared_train= rsq, MAE_train = mae) 
 rownames(M) <- NULL
-
+write.csv(M, "M.csv")
 rm(M_p, M_d, M_e, M1, M2, M3, M4)
 ```
+
 
 ```{r print the out-of-sample errors, echo=FALSE}
 Metrics_p <- left_join(x = Metric1, y = Metric2, by = "metric") 
@@ -400,8 +402,9 @@ Metrics_com <- left_join(x = M, y = Metrics, by = "Model")
 
 knitr::kable(Metrics_com, format = "markdown", caption = " Model Performances")
 
-rm(Metrics_p, Metrics_d, Metrics_e, Metric1, Metric2, Metric3, Metric4, M)
+write_csv(Metrics_com, "Metrics_com.csv")
 rm(split, bit_training)
+rm(Metrics_p, Metrics_d, Metrics_e, Metric1, Metric2, Metric3, Metric4, M)
 ```
 Although the out-of-sample error for random forest model notably outweights the in-sample error, the model performance is still superior to linear regression models and KNN models. Meanwhile, Not addressing time-series features does not incur significant prediction bias. Since AR model was only able to improve linear gravity model by a small amount, there is not much time effects that can be exploited when predicting trade flows based on the past values. The reason may be a small time spans relative to a large number of country pairs, so seriel dependence of bilateral trade flow is very trivial. Therefore, the random forest model dose work well enough to predict bilateral trade flow.
 
