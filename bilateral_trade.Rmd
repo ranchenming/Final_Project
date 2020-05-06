@@ -1,5 +1,5 @@
 ---
-title: "Predicting Bilateral Trade: Gravity Model V.S. Supervised Machine Learning"
+title: "Predicting Bilateral Trade: Linear V.S. Non Linear Predictions"
 author: "Chenming Ran"
 date: "4/26/2020"
 output: html_document
@@ -406,8 +406,8 @@ As for the first KNN model, there are large increase in RMSE and MAE and decreas
 
 ```{r scatter test, include=FALSE}
 t_1 <- bind_cols(
-  bake(recipe1, new_data = bitrade_testing),
-  predict(lm_model, bake(recipe1, new_data = bitrade_testing)))
+  bake(recipe1, new_data = bit_testing),
+  predict(lm_model, bake(recipe1, new_data = bit_testing)))
 
 t_r <- t_1 %>%
   select(FLOW, .pred) %>%
@@ -416,8 +416,8 @@ t_r <- t_1 %>%
 rm(t_1)
 
 t_2 <- bind_cols(
-  bake(recipe2, new_data = bitrade_testing),
-  predict(lm_AR_model, bake(recipe2, new_data = bitrade_testing)))
+  bake(recipe2, new_data = bit_testing),
+  predict(lm_AR_model, bake(recipe2, new_data = bit_testing)))
 
 t_s <- t_2 %>%
   select(FLOW, .pred) %>%
@@ -426,8 +426,8 @@ t_s <- t_2 %>%
 rm(t_2)
 
 t_3 <- bind_cols(
-  bake(recipe1, new_data = bitrade_testing),
-  predict(rf_model, bake(recipe1, new_data = bitrade_testing)))
+  bake(recipe1, new_data = bit_testing),
+  predict(rf_model, bake(recipe1, new_data = bit_testing)))
 write.csv(t_3, "t3.csv")
 
 t_t <- t_3 %>%
@@ -437,8 +437,8 @@ t_t <- t_3 %>%
 rm(t_3)
 
 t_4 <- bind_cols(
-  bake(recipe3, new_data = bitrade_testing),
-  predict(knn_model, bake(recipe3, new_data = bitrade_testing)))
+  bake(recipe3, new_data = bit_testing),
+  predict(knn_model, bake(recipe3, new_data = bit_testing)))
 write.csv(t_4, "t4.csv")
 
 t_u <- t_4 %>%
@@ -515,7 +515,7 @@ t_u <-
         axis.title.y = element_text(size = rel(1)),
         axis.title.x = element_text(size = rel(1)))
 
-rm(t_r, t_s. t_t, t_u)
+rm(t_r, t_s. t-t, t_u)
 ```
 
 ### 5.2 Make Prediction on Entire Dataset 
@@ -544,7 +544,6 @@ kable(final_r %>%
 
 A scatter plot of the predicted vs. actual prices shows residuals with a some outliers at the right side, which are not well explained by the model. The predictions are more accurate for country pairs with smaller trade flows relative to those having large bilateral trade flow. Nevertheless, the model shows fairly good level of robustness.
 ```{r scatter-plot 2, fig.height=2, fig.width=3, echo=FALSE, warning=FALSE}
-
 final_r %>%
   mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
   ggplot(aes(Pre_Trade_Flow, Trade_Flow)) +
