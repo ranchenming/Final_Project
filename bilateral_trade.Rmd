@@ -1,5 +1,5 @@
 ---
-title: "Predicting Bilateral Trade: Gravity Model V.S. Machine Learning"
+title: "Predicting Bilateral Trade: Gravity Model V.S. Supervised Machine Learning"
 author: "Chenming Ran"
 date: "4/26/2020"
 output: html_document
@@ -15,195 +15,613 @@ library(tidymodels)
 library(haven)
 library(Hmisc)
 library(pastecs)
+library(tseries)
+library(parsnip)
 ```
 
-## Data Description
+##1. Introduction
 
-In general, a gravity model assumes that the volume of trade between any two economies will be directly proportional to the product of their economic masses that are commonly measured by GDP or GNP. For predicting aggregate bilateral trade, the aggregate GDP value is the suitable proxy in term of cross-country time-series data. While Circlaeys et al.(2017) used  nominal GDP, this study uses trade quantity and real GDP for estimation, which is universally recognized as a more accurate measure of production output 
+###1.1 Bilateral Trade
 
-Although “Tradhist” from Centre d'Etudes Prospectives et d'Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017), the data is only available up to the year 2014. Different from Circlaeys et al. (2017) analyzing bilateral trade flow from 2009 to 2014, I analyze bilateral trade from 1995 to 2018, so key indicators of Bilateral trade flow and GDP will be recreated and updated. Time-invariant indicators, including weighted distances and other control variables, will be adopted from "Tradehist".
+Bilateral trade flow represents the value of goods and services exports between two countries, and this is an important economic indicators influencing international trade policy [1]. The prediction of bilateral trade flow is commonly based on The Gravity Model of Trade, a model using GDP and distance between trade entities to predict bilateral trade [2]. This is particularly important for trade-oriented countries because the composition and direction of bilateral trade flow provides thorough insights on comparative advatnage and economic growth.[3]
+
+###1.2 Relevant Study
+
+While most existing international-trade studies investigated trade based on traditional econometric approaches, some studies have applied more advanced techniques, meaning machine learning (ML) algorithms, to predict different catergoies of trade flow, such as cross-country [3] and cross-sectional [4] imports and exports. There are much fewer studies that apply ML techiques for bilateral and multilateral analysis. However, Circlaeys, Kaniktar and Kumazawa did a pionner study that used supervised machine learning for predicting trade flow [5]. Their study found prediction accuracy has a 30% increase with feedforward neural network regression relative to linear regressions. Thus, he study identifies the potential need to address nonlinearity of the Gravity Model by using ML algorithms relative to traditional logarithm transformations, as the latter one is still linear in parameters while demonstrating nonlinearity.
+
+###1.3 Research Question 
+This project investigates the performance of supervised ML techniques to predict bilateral trade flow which uses a variety of indicators based on Gravity model. To a great extent, I replicate a study done by Circlaeys et al.(2017), but uses two ML techniques that were not covered: Random Forest Regression Tree and K-Nearest Neighbor (KNN) Regression.Specifically, I compare efficiencies among log-linear model, log-AR model, random forest and KNN regression, and pick the optimal model and apply to the entire dataset. This involves data training and testing process for cross-validation. I also use a different subset of data from the original data source used by Circlaeys et al.(2017) and make updates to 2018, in order to test more recent bilateral trade performance. Overall, this project investigates in detail whether superior nonlinear predictions by CART and KNN models improves the performance of Gravity Model over linear combinations. 
+
+##2. Data Description
+
+###2.1 Data Source
+
+“Tradehist” from Centre d'Etudes Prospectives et d'Informations Internationales (CEPII) is the original database used by Circlaeys et al. (2017) [6]. The original data set contains 1.9 million data points from the 1827 to 2014 for over 200 different different countries and territories. The dataset also covers Nominal GDPs, Distance, Bilateral trade flow, tarriffs, exchange rate, and country-pairs (such as  France to Germany, etc.) that can be used to build the Gravity Model.
+Time-invariant indicators, including weighted distances and other control variables, are also included from "Tradehist". Similar to Circlaeys et al. (2017), I test a list of interested variables from "Tradehist"as below:
+
 ```{r variable selection, fig.align="center", fig.width= 6, fig.height= 3, echo=FALSE}
 library(jpeg)
 library(grid)
 img <- readJPEG("features.jpg")
  grid.raster(img)
 ```
-Therefore, this study obtained a dataset contains 605 thousand data points from the 1995 to 2014 for 226 different countries and territories. Our data set has both geographical dimension (country-pairs, such as USA to China, France to Germany, etc.) and time dimension. 
+
+###2.2 Data Transformation and Manipulation
+
+Nevertheless, the "Tradehist"data is only available up to the year 2014. In order to investigate more recent trend of bilateral trade flow, I recreate key indicators of "Tradehist" database from other more updated database from CEPII. 
+
+Other than "Tradehist", BACI" is the major bilateral trade database provided by CEPII [7]. This database provides yearly data on bilateral trade flows at the product level. Products are identified using the Harmonized System (HS), a standard nomenclature for international trade, Ths HS was revised in 1992, 1996, 2002, 2007, 2012 and 2017. For this study, I use HS92 version that has data vailable from 1995 to 2018, the bilateral trade value is obtained by collapsing trade flow for each country pair and year.
+
+For predicting aggregate bilateral trade, the aggregate GDP value and weigthed circle distance between countries are the suitable proxies for production output and distance of trade. While Circlaeys et al.(2017) used nominal GDP, this study uses real GDP for estimation, which is universally recognized as a more accurate measure of production output. I gather GDP (current U.S.$) and inflation rate from the World Development Indicators [6] and World Bank National Account Data [8], so the real GDP is calculated as Nominal GDP / (1 +inflation Rate).
+
+The gravity model also incorporates distance between trade origin and destination. Circlaeys et al.(2017) uses 'great circle distance’ between two countries from the "Tradehist" database. 
+The time-invariant indicators from "Tradehist" database also include controls like language, sharing a common border that are used by Circlaey et al.(2017). Togther with weighted great circle distance, those indicators are equivalent as those from the database "GeoDsit", another CEPII database incorporates country-specific geographical variables. I incorporate data for distance and bilateral time-invariant controls from "GeoDist" [9].
+
+Population is a control variable commonly  used by Circlaeys et al (2017). Therefore, this study also incorportations country total population data from United Nations Population Division  — World Population Prospect from 1995 to 2018 [10]. 
+
+OECD member and GATT member were also used as controls by Circlaeys et al.(2017), and they are avilable as country time-invariant variables in the "Tradehist" database [6]. To note, the status of OECD and GATT is not completely time-invariant because countries joined OECD and WTO in different years. The two organizations also have new membership from 2014 to 2018, which I updated by hand in the excel sheet beforehand.
+
+###2.3 Data Cleansing
+
+To avoid abnormalities in data and potential obstacles in the process of prediction, I remove incomplete data from the data set, which means data points that have missing feature values. Those missing values come from some countries having absent GDP and weighted distance information, which can bias gravity-model based results.
+
+Meanwhile, I removed observations that involve both South Sudan and Sudan because thier iso code and country code were overlapping in the past decades, causing difficulty in matching. There are 5554 observations related to Sudan and South Sudan, which is comparatively small to my entire dataset and thus can be directly removed.
+
+### 2.4 Summary of Dataset
+By removing troublesome observations, I obtain a dataset containing 489 thousand data points from the 1995 to 2018 for 226 different countries and territories (29930 country pairs in total). Our data set has both geographical dimension (country-pairs, such as USA to China, France to Germany, etc.) and time dimension. 
 ```{r data, include=FALSE}
 new_bitrade <- read_dta("new_bitrade.dta")
 bitrade <- new_bitrade  %>%
-  filter(!is.na(GDP_o),!is.na(GDP_d), !is.na(pop_o), !is.na(pop_d), !is.na(distw)) 
+  filter(!is.na(GDP_o),!is.na(GDP_d), !is.na(distw), iso_o != "SDN", iso_d != "SDN") %>% #Sudan and South Sudan has conflicted iso and country code so I eliminate for my analysis (494420-488866 = 55540 observations related to Sudan and South Sudan, which is comparatively small to my sample)
+  arrange(year)
 
 rm(new_bitrade)
 ```
-To avoid abnormalities in data and potential obstacles in the process of prediction, first I remove incomplete data from the data set, which means data points that have missing feature values. 
-```{r summarystats, echo=FALSE}
-description <- bitrade %>%
-  select(-year, -country_code_o, -country_code_d, -iso_o, -iso_d, -country_o, -country_d, -comlang, -contig, -OECD_o, -GATT_o, -OECD_d, -GATT_d) 
-knitr::kable(summary(description))
-```
 
-Second, I take the log of trade value,e a smoother distribution of the data. All independent variables are standardized to fit the assumptions of linear regression and K-Nearest Neighbors. CART analysis does not assume a particular form of relationship between the independent and dependent variables, but variables still need to be normalized so to avoid bias when comparing metrics.
-```{r summarystats2, echo=FALSE}
-desp1 <- description %>%
-   mutate(lflow = log(FLOW), lgdp_o = log(GDP_o), lgdp_d = log(GDP_d), lpop_o = log(pop_o),      lpop_d = log(pop_d), ldistw = log(distw)) %>%
-   select(-FLOW, -GDP_o, -GDP_d, -pop_o, -pop_d, -distw)
-desp <- stat.desc(desp1, basic=F)
-knitr::kable(desp)
-
-rm(desp1, description, desp)
-```
-
-```{r histogram, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
-hist(log(bitrade$FLOW),
-     main="Bilateral Trade Flow",
-     freq = FALSE,
-     xlab="Trade Value($); logged",
-     xlim=c(5,30),
-     ylim=c(0.00, 0.12),
-     col="darkblue")
-x<-seq(5,30, by = 5)
-curve(dnorm(x, mean=mean(log(bitrade$FLOW)), sd=sd(log(bitrade$FLOW))), add=TRUE)
-```
-
-The graph shows that there are some heterogenieties of bilateral trade flow over time, whereas most of the changes are persistent. Therefore, in the next section, I apply autocorrelation and partial-autocorrelation to test whether lagged variable is needed for performing time-series effect.
-```{r lineplot, fig.align="center", echo=FALSE, message=FALSE, warning=FALSE}
-bitrade$year =  as.Date(bitrade$year, "%Y")
+```{r time-series, echo=FALSE, fig.align="center", fig.height=2, fig.width=3, message=FALSE, warning=FALSE}
 line <- bitrade %>%
   group_by(year) %>%
-  dplyr::summarize(trade_value = mean(FLOW)) 
-  
-ggplot(line, aes(x=year, y=trade_value/1000000, group = 1)) +
-  geom_line(color="black") +
-  xlab("Year") +
-  ylab("Average $ Billion")+
-  ggtitle("Bilateral Trade Flow") +
-  theme_minimal() +
-  theme_classic() +
-  theme(legend.position = "right", plot.title = element_text(hjust = 0.5)) 
+  dplyr::summarize(trade_value = mean(FLOW)/1000000) 
+
+ts.plot(line, xlab="Year", ylab="Trade Flow (Million US$)", ylim = c(200, 1000), main="Graph 1. Average of Bilateral Trade Flow, 1995-2018")
 
 rm(line)
 ```
+The graph shows the pattern of avaerge bilateral trade flow over time, whereas most of the changes are quite persistent. In the next section I apply autocorrelation and partial-autocorrelation to test the need to address time series effects.
 
-### Autocorrelation and Partial-Autocorrelation
+##3. Emprical Models
 
-First, Augmented Dickey-Fuller Test (ADF test) and Kwiatkowski–Phillips–Schmidt–Shin (KPSS test) are used to test if the data is stationary. For both tests, a p-Value of less than 0.05 indicates that the bilateral trade flow is stationary.
+Following circlaeys et al. (2017), I attempt to attain superior predictive ability of bilateral trade flow using supervised machine learning methods. Since techniques like random forest and K-Nearest Neighbors are more efficient in modelling non-linear relationship, I investigate whether non-linear combinations of the gravity model improve its prediction performance over a linear combination. Similar to a branch of econometrics that is focused more on forecasting rather than on inference, this study follows the purpos of traditional linear models like OLS, AR and Fixed-Effects.
+
+###3.1 Gravity Model with Logarthm Transformations
+
+As discussed above, Gravity Model describes the bilateral trade flow as a functional form of interactions among the GDPs and distance. This is the baseline model for this study and its equation is shown as below:
+```{r formula1, fig.align="center", fig.width= 6, fig.height= 0.5, echo=FALSE}
+library(jpeg)
+library(grid) 
+img1<- readJPEG("equation1.jpg")
+grid.raster(img1)
+
+```
+Continuous variables, including trade flow, GDP, weighted distance and population, are transformed into logathrithms. This helps to achieve a smoother distribution of the data that fits the assumption of linear regression, which is traditional method to addresss non-linearity. Control features used by by Circlaeys et al. (2017), including population, share of language, contiguity, OECD, GATT are also included in the model.
+
+###3.2 Linear Regression with Autoregressive Model (AR)
+
+Similar to Circlaey et al.(2017), I also compare the performance of time series models against the other proposed models. The feasibility of time-series model is examined before hand to determine the specific AR model, shown in the next two sub-sections.
+
+####3.2.1 Stationarity
+
+For testing stationarity, Augmented Dickey-Fuller Test (ADF test) and Kwiatkowski–Phillips–Schmidt–Shin (KPSS test) are used to test if the data is stationary. For both tests, a p-Value of less than 0.05 indicates that the bilateral trade flow is stationary. It is appropriate for empirical analysis to take into account time-series effect
 ```{r stationary, echo=FALSE}
-library(tseries)
 adf.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
 kpss.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
 ```
 
-The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. However, for the partial autocrrelation, the graph shows that the correlation of the time series with a lag of itself is quite signficant. For empirical analysis, I include on lage of bilateral trade flow for investigating the performance of time series models against the other proposed models.
-```{r PA, echo=FALSE, fig.align="center", fig.height=4, fig.width=6, message=FALSE, warning=FALSE}
+####3.2.2 Autocorrelation and Partial-Autocorrelation
+
+The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. Thus, there are modest time-series effects to address that one year lag of dependent variable is good for prediction.
+```{r PA, echo=FALSE, fig.align="center", fig.height=2, fig.width=3, message=FALSE, warning=FALSE}
 library(Hmisc)
 acfRes <- acf(bitrade$FLOW, plot = FALSE) # autocorrelation
-plot(acfRes, main = "Bilateral Trade Flow Time Series ACF")
-pacfRes <- pacf(bitrade$FLOW, plot = FALSE)  # partial autocorrelation
-plot(pacfRes, main = "Bilateral Trade Flow Time Series Partial ACF")
-
+plot(acfRes, main = "Graph 2. Bilateral Trade Flow Time Series ACF")
 rm(acfRes, pacfRes, x)
 ```
-
-## Emprical Model
-
-As discussed above, Gravity Model describes the interactions among the GDPs and distance in a functional form inspired by Newton’s law of universal gravitation. Becuase, the change of bilateral trade flow is almost persistent over time, a traditional time series model including one lag of trade flow will be tested. The equation shows as below:
-```{r formula, fig.align="center", fig.width= 6, fig.height= 0.5, echo=FALSE}
+In this case, I build a traditional autoregressive model (AR) with one-lag of bilateral trade flow at the right-hand side. Similar to the baseline Gravity Model, the model involves logathrism formation of continuous variables along with controls. The equation is shown as below:
+```{r formula2, fig.align="center", fig.width= 6, fig.height= 0.5, echo=FALSE}
 library(jpeg)
 library(grid)
-img2<- readJPEG("equation.jpg")
+img2<- readJPEG("equation2.jpg")
 grid.raster(img2)
+
+rm(img,img1,img2)
 ```
 
-Control features are discussed above and were used by by Circlaeys et al. (2017), including population, share of language, contiguity, OECD, GATT are also. For model estimation, I test the model using three different Machine Learning (ML) techniques, including Linear Regression with Autogressive Model, CART Regression Model and K-Nearest Neighbors algorithm, in order to compare the performance of the linear time-series model against the other ML models.
+###3.3 Random Forest Model 
 
-##  Comparison Metrics and Validation Method
+Random Forest model works is an extension of decsion tree as it bulds multiple decision trees within random subsets of the data. Then each decision tree seperates the data into multiple sub-spaces so that the outcomes are maximumly homogeneous. random forest can handle both numerical and categorical data, which fits the bilateral trade dataset, and nonlinear relationships do not affect its performance. Although it does not capture time-series effects, the ACF test shows that actuall time-series effects are likely to be small. Hence using ML techniques incapable of addressing time-series effects is less concerned for bias of comparison. 
+
+###3.4 K-Nearest Neighbor Model 
+KNN works by finding the distances between a case and all observations in the data, selecting the specified number of observations (k) closest to the case, and finally averaging the distances. Given its feature, KNN model can predict an aggregation of historical values of the time series by associated the future value of the time series with past values. Nevertheless, it may causes computational difficulty as it becomes significantly slows when dealing with large size of data. This is discussed in the session of training model.
+
+For this study, I estimate Random regression tree for the baseline Gravity Model and estimate KNN regression by adding time-series features. This means that I apply random forest to the first equation and KNN model to the second equation. 
+
+## 4. Model Estimation 
+
+###4.1 Validation Method and Comparison Metrics
 
 Following Circlaeys et al.(2017), R-squared is used as the main metric to compare the predictive performances of our models, which is commonly used as a measure for goodness of fit. RMSE and MAE are also included for evaluation.
 
-According to Circlaeys et al.(2017), since I have enough data, I can conduct a hold-out validation using 30% of the entire data set. This means to separate the data set into a training set and a test set instead of conducting k-fold validation. The original data set is separated into the train set of 346,094 examples (70%) and test set of 148,326 examples (30%). 
+Circlaeys et al.(2017) conducted a hold-out validation using 30% of the entire dataset. This means to separate the data set into a training set and a test set instead of conducting k-fold validation. The study had over 900 thousand observations in training data that the chance of over-fitting is relatively small. I use data of smaller time range which separated into the train set of 342,2207 examples (70%) and test set of 146,659 examples (30%). Given it is still considered a large amount of observations, I flow Circlaeys et al.(2017) to conduct a hold-out vailidation using 30% of the entire dataset.
+
+Importantly, the k-fold validation method could be effcient for this study, but computational difficulty becomes a huge problem because each of the fold is used as a validation set while the remaining data are used as a training set to fit the model. Therefore, cross-validation on KNN model is extremely diffult as the model fitting process becomes even slower. In fact, k-fold validation is recognized as particularly useful for limited data, which is not the case here.
+
 ```{r splitting training and testing data}
 set.seed(20200302)
 split <- initial_split(data = bitrade, prop = 0.7)
 bit_training <- training(split)
 bit_testing <- testing(split)
 ```
+  
+###4.2 Assumptions
 
+####4.2.1 Normal Distribution
 
-```{r train models}
-#create a recipe for preprocessing the data: standardization
+The distributions of trade flow, GDP, population and weighted distance are approximately normal, which is shown in the graph below. To note K-Nearest Neighbors do not assume normal distribution and CART model does not assume relationship in advance, continuous variables are still transformed into logarithsm, in order to test whether the efficiency of addressing non-linearity improves from logarithm transformation to advanced algorithsm.
+
+```{r histogram, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
+par(mfrow=c(2,3))
+hist(log(bitrade$FLOW),
+     main="Bilateral Trade Flow",
+     freq = FALSE,
+     xlab="Trade Value(U.S $); logged",
+     xlim=c(5,30),
+     ylim=c(0.00, 0.12),
+     col="darkblue")
+x<-seq(5,30, by = 5)
+curve(dnorm(x, mean=mean(log(bitrade$FLOW)), sd=sd(log(bitrade$FLOW))), add=TRUE)
+
+hist(log(bitrade$GDP_o),
+     main="GDP of Trade Origin Country",
+     freq = FALSE,
+     xlab="Real GDP (U.S $); logged",
+     xlim=c(15,35),
+     ylim=c(0.00, 0.18),
+     col="darkorchid4")
+x<-seq(15,35, by = 5)
+curve(dnorm(x, mean=mean(log(bitrade$GDP_o)), sd=sd(log(bitrade$GDP_o))), add=TRUE)
+
+hist(log(bitrade$GDP_d),
+     main="GDP of Trade Destination Country",
+     freq = FALSE,
+     xlab="Real GDP (U.S $); logged",
+     xlim=c(15,35),
+     ylim=c(0.00, 0.18),
+     col="darkorchid4")
+x<-seq(15,35, by = 5)
+curve(dnorm(x, mean=mean(log(bitrade$GDP_d)), sd=sd(log(bitrade$GDP_d))), add=TRUE)
+
+hist(log(bitrade$distw),
+     main="Weighted Distance",
+     freq = FALSE,
+     xlab="Distance (Kilometers); logged",
+     xlim=c(4,12),
+     ylim=c(0.00, 0.7),
+     col="darkorange4")
+x<-seq(4,12, by = 4)
+curve(dnorm(x, mean=mean(log(bitrade$distw)), sd=sd(log(bitrade$distw))), add=TRUE)
+
+hist(log(bitrade$pop_o),
+     main="Pop. of Trade Origin Countries",
+     freq = FALSE,
+     xlab="No. of People; logged",
+     xlim=c(5,25),
+     ylim=c(0.00, 0.30),
+     col="darkgreen")
+x<-seq(5,25, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$pop_o)), sd=sd(log(bitrade$pop_o))), add=TRUE)
+
+hist(log(bitrade$pop_d),
+     main="Pop. of Trade Destination Countries",
+     freq = FALSE,
+     xlab="No. of People; logged",
+     xlim=c(5,25),
+     ylim=c(0.00, 0.30),
+     col="darkgreen")
+x<-seq(5,25, by = 3)
+curve(dnorm(x, mean=mean(log(bitrade$pop_d)), sd=sd(log(bitrade$pop_d))), add=TRUE)
+```
+
+####4.2.2 Standization Methods
+
+All independent variables are standardized to fit the assumptions of K-Nearest Neighbors.
+Given half of the indicators are categorical, I rescale all indicators to be within 0 and 1.
+
+```{r train}
+#Normal distribution for Gravity Model (Linear Regression with logarithmic features)
 recipe1 <-
    recipe(formula = FLOW ~ ., data = bit_training) %>%
-   step_lag(FLOW, lag = 1, default = NA) %>%
-   step_naomit(lag_1_FLOW) %>%   # delete 1 obeservation due to NA in lagged variable
    step_rm(year, country_code_o, country_code_d, iso_o, iso_d, country_o, country_d) %>%
-   step_normalize(all_predictors()) %>%
-   step_log(FLOW) %>%
+   step_log(FLOW, GDP_o, GDP_d, pop_o, pop_d, distw) %>%    # Transform logarithsm
    prep()
 
-# train linear regression model 
+# lagged variables for Linear Regression with Autoregressive Model, which is also used for CART
+recipe2 <-
+   recipe(formula = FLOW ~ ., data = bit_training) %>%
+   step_rm(year, country_code_o, country_code_d, iso_o, iso_d, country_o, country_d) %>%
+   step_log(FLOW, GDP_o, GDP_d, pop_o, pop_d, distw) %>%    # Transform logarithsm
+   step_lag(FLOW, lag = 1, default = NA) %>%
+   step_naomit(lag_1_FLOW) %>%   # delete 1 obeservation due to NA in lagged variable
+   prep()
+
+#normalization for KNN Model
+recipe3 <-
+   recipe(formula = FLOW ~ ., data = bit_training) %>%
+   step_rm(year, country_code_o, country_code_d, iso_o, iso_d, country_o, country_d) %>%
+   step_log(FLOW, GDP_o, GDP_d, pop_o, pop_d, distw) %>%    # Transform logarithsm
+   step_lag(FLOW, lag = 1, default = NA) %>%
+   step_naomit(lag_1_FLOW) %>%   # delete 1 obeservation due to NA in lagged variable
+   step_range(all_predictors()) %>%  #center mean to 0 and with standard deviation to 1.
+   prep()
+```
+
+##5. Model Training and Estimation 
+
+Accordingly, I trained 4 different models discussed above, with 3 different recipes addressing major model assumptions. For estimating KNN model, I follow the conventional determination of k and choose the value to be 588, which is the square root of sample number in my training dataset.
+
+```{r train models}
+# train Gravity model 
 lm_model <- linear_reg() %>%
   set_engine("lm") %>%
   fit(formula = FLOW ~., data = bake(recipe1, new_data = bit_training))
 
-# train CART regression model
-cart_model <-
-  decision_tree(mode = "regression") %>%
-  set_engine("rpart") %>%
-  fit(formula = FLOW ~., data = bake(recipe1, new_data = bit_training))
+#train linear regression with Autoregressive Model
+lm_AR_model <- linear_reg() %>%
+  set_engine("lm") %>%
+  fit(formula = FLOW ~., data = bake(recipe2, new_data = bit_training))
 
-# train KNN regression model
-#In general practice, choosing the value of k is k = sqrt(N) where N stands for the number of samples in your training dataset.
+#train random forest model
+rf_model <- rand_forest(mode = "regression", mtry = 3, trees = 1000) %>%
+  set_engine("ranger") %>%
+  fit(FLOW ~., data = bake(recipe1, new_data = bit_training))
+  
+# train the KNN regression model
 knn_model <- nearest_neighbor(mode = "regression",
                               neighbors = 588) %>%
   set_engine(engine = "kknn") %>%
-  fit(formula = FLOW ~., data = bake(recipe1, new_data = bit_training))
+  fit(formula = FLOW ~., data = bake(recipe3, new_data = bit_training))
 
 saveRDS(knn_model, "model_knn.rds", compress = FALSE)
-````
+saveRDS(rf_model, "randomf.rds", compress = FALSE)
+```
 
-```{r estimate the out of sample error, echo=TRUE}
+### 5.1 In-Sample and Out-of-Sample Errors
+
+I estimate the in-sample and out-of-sample error rates by predicting values in both training and testing data set. Among all models, the random forest model has the best performance over training and test datasets. According to the Table 1 below, most in-sample and out-of-sample errors are close for each model except for the random forest model and KNN model. This means a hold-out validation using 30% of the entire dataset is fairly efficient. The reason is that my updated dataset does not have as large sample as Circlaeys' study. A k-fold cross validation should decrease the chance of overfitting.
+
+Nevertheless, conducting k-fold cross validation has huge computational costs for training KNN and Random forest models. Especially with over 300 thousand data, parsing a sample of data into complementary subsets and performing on training data further slows the speed of KNN algorithm. Since computational cost is a real equipment issue that cannot be solved with R. Therefore, I insists hold-out validation as Circlaeys' et al.(2017) did, assuming my dataset is sufficiently large relative to other small datasets.
+
+```{r estimate the in-sample error, include=FALSE}
+#Estimate the out-of-sample error rate by predicting values in the testing data set.
+M1 <- bind_cols(
+  bake(recipe1, new_data = bit_training),
+  predict(lm_model, bake(recipe1, new_data = bit_training))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (Linear_Gravity_model = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+M2 <- bind_cols(
+  bake(recipe2, new_data = bit_training),
+  predict(lm_AR_model, bake(recipe2, new_data =bit_training))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (AR_model = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+M3 <- bind_cols(
+      bake(recipe1, new_data = bit_training),
+      predict(rf_model, bake(recipe1, new_data = bit_training))) %>%
+      metrics(truth = FLOW, estimate = .pred) %>%
+      rename (RF_model = .estimate, metric = .metric) %>%
+      select(-.estimator)
+
+M4 <- bind_cols(
+  bake(recipe3, new_data = bit_training),
+  predict(knn1_model, bake(recipe3, new_data = bit_training))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (KNN_model_1 = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+write_csv(M3, "M3.csv")
+write_csv(M4, "M4.csv")
+```
+
+```{r estimate the out-of-sample error, include=FALSE}
 #Estimate the out-of-sample error rate by predicting values in the testing data set.
 Metric1 <- bind_cols(
   bake(recipe1, new_data = bit_testing),
   predict(lm_model, bake(recipe1, new_data = bit_testing))) %>%
   metrics(truth = FLOW, estimate = .pred) %>%
-  rename (LM_model = .estimate, metric = .metric) %>%
+  rename (Linear_Gravity_model = .estimate, metric = .metric) %>%
   select(-.estimator)
 
-#Estimate the out-of-sample error rate by predicting values in the testing data set.
 Metric2 <- bind_cols(
-  bake(recipe1, new_data = bit_testing),
-  predict(cart_model, bake(recipe1, new_data = bit_testing))) %>%
+  bake(recipe2, new_data = bit_testing),
+  predict(lm_AR_model, bake(recipe2, new_data = bit_testing))) %>%
   metrics(truth = FLOW, estimate = .pred) %>%
-  rename (CART_model = .estimate, metric = .metric) %>%
+  rename (AR_model = .estimate, metric = .metric) %>%
   select(-.estimator)
 
-#Estimate the out-of-sample error rate by predicting values in the testing data set.
 Metric3 <- bind_cols(
   bake(recipe1, new_data = bit_testing),
-  predict(knn_model, bake(recipe1, new_data = bit_testing))) %>%
+  predict(rf_model, bake(recipe1, new_data = bit_testing))) %>%
   metrics(truth = FLOW, estimate = .pred) %>%
-  rename (KNN_model = .estimate, metric = .metric) %>%
+  rename (RF_model = .estimate, metric = .metric) %>%
+  select(-.estimator)
+
+Metric4 <- bind_cols(
+  bake(recipe3, new_data = bit_testing),
+  predict(knn1_model, bake(recipe3, new_data = bit_testing))) %>%
+  metrics(truth = FLOW, estimate = .pred) %>%
+  rename (KNN_model_1 = .estimate, metric = .metric) %>%
   select(-.estimator)
 
 write_csv(Metric3, "Metric3.csv")
-````
+write_csv(Metric4, "Metric4.csv")
+```
 
-```{r print the out-of-sample errors, echo=TRUE}
+```{r print the in-sample errors, echo=FALSE}
+M_p <- left_join(x = M1, y = M2, by = "metric") 
+M_d <- left_join(x= M_p, y = Metric3, by = "metric")
+M_e <- left_join(x= M_d, y = Metric4, by = "metric")
+M <- as.data.frame(t(M_e)) 
+M <- data.frame(row.names(M), M, row.names = NULL) #change index into column
+names(M) = as.character(unlist(M[1,])) #change first row into column names
+M <- M[-1,] %>%
+   rename(Model = metric, RMSE_train = rmse, Rsquared_train= rsq, MAE_train = mae) 
+rownames(M) <- NULL
+
+rm(M_p, M_d, M_e, M1, M2, M3, M4)
+```
+
+```{r print the out-of-sample errors, echo=FALSE}
 Metrics_p <- left_join(x = Metric1, y = Metric2, by = "metric") 
 Metrics_d <- left_join(x= Metrics_p, y = Metric3, by = "metric")
-Metrics <- as.data.frame(t(Metrics_d)) 
+Metrics_e <- left_join(x= Metrics_d, y = Metric4, by = "metric")
+Metrics <- as.data.frame(t(Metrics_e)) 
 Metrics <- data.frame(row.names(Metrics), Metrics, row.names = NULL) #change index into column
 names(Metrics) = as.character(unlist(Metrics[1,])) #change first row into column names
 Metrics <- Metrics[-1,] %>%
-   rename(Model = metric, RMSE = rmse, Rsquared = rsq, MAE = mae) 
+   rename(Model = metric, RMSE_test = rmse, Rsquared_test= rsq, MAE_test = mae) 
 rownames(Metrics) <- NULL
-knitr::kable(Metrics)
 
-rm(Metrics_p, Metrics_d, Metric1, Metric2, Metric3)
+Metrics_com <- left_join(x = M, y = Metrics, by = "Model") 
+
+kable(Metrics_com, format = "markdown", caption = " Model Performances")
+
+rm(Metrics_p, Metrics_d, Metrics_e, Metric1, Metric2, Metric3, Metric4, M)
+rm(split, bit_training)
+```
+Although the out-of-sample error for random forest model notably outweights the in-sample error, the model performance is still superior to linear regression models and KNN models. Meanwhile, Not addressing time-series features does not incur significant prediction bias. Since AR model was only able to improve linear gravity model by a small amount, there is not much time effects that can be exploited when predicting trade flows based on the past values. The reason may be a small time spans relative to a large number of country pairs, so seriel dependence of bilateral trade flow is very trivial. Therefore, the random forest model dose work well enough to predict bilateral trade flow.
+
+As for the first KNN model, there are large increase in RMSE and MAE and decrease in R-squared when predicting values in testing dataset, which means the extent of overfitting is large. Thus, The KNN model is not likely to be more effective than linear regression model. I recognize a 10 fold cross-validation may increase the accuracy of KNN, but the random forest certainly performs much better among alll mondels. Below are scatter plots that demonstrate the goodness of fit for each model.
+
+```{r scatter test, include=FALSE}
+t_1 <- bind_cols(
+  bake(recipe1, new_data = bitrade_testing),
+  predict(lm_model, bake(recipe1, new_data = bitrade_testing)))
+
+t_r <- t_1 %>%
+  select(FLOW, .pred) %>%
+  mutate(Trade_Flow = exp(FLOW), Pre_Trade_Flow = exp(.pred)) %>%
+  rename(lflow = FLOW)
+rm(t_1)
+
+t_2 <- bind_cols(
+  bake(recipe2, new_data = bitrade_testing),
+  predict(lm_AR_model, bake(recipe2, new_data = bitrade_testing)))
+
+t_s <- t_2 %>%
+  select(FLOW, .pred) %>%
+  mutate(Trade_Flow = exp(FLOW), Pre_Trade_Flow = exp(.pred)) %>%
+  rename(lflow = FLOW)
+rm(t_2)
+
+t_3 <- bind_cols(
+  bake(recipe1, new_data = bitrade_testing),
+  predict(rf_model, bake(recipe1, new_data = bitrade_testing)))
+write.csv(t_3, "t3.csv")
+
+t_t <- t_3 %>%
+  select(FLOW, .pred) %>%
+  mutate(Trade_Flow = exp(FLOW), Pre_Trade_Flow = exp(.pred)) %>%
+  rename(lflow = FLOW)
+rm(t_3)
+
+t_4 <- bind_cols(
+  bake(recipe3, new_data = bitrade_testing),
+  predict(knn_model, bake(recipe3, new_data = bitrade_testing)))
+write.csv(t_4, "t4.csv")
+
+t_u <- t_4 %>%
+  select(FLOW, .pred) %>%
+  mutate(Trade_Flow = exp(FLOW), Pre_Trade_Flow = exp(.pred)) %>%
+  rename(lflow = FLOW)
+rm(t_4)
 ```
 
-## Reference
+```{r scatter plot, include=FALSE}
+par(mfrow=c(2,2))
 
-[1] S. Circlaeys, C. Kanitkar, and D. Kumazawa, “Bilateral Trade Flow Prediction”, available at: http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf, 2017 
+t_r %>%
+  mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
+  ggplot(aes(Pre_Trade_Flow, Trade_Flow)) +
+  geom_point(alpha = .2) +
+  geom_smooth() +
+  xlab("Predicted Trade Flow")+
+  ylab("Actual Trade Flow") +
+  labs(title = "Linear Gravity Model") +
+   theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size=rel(1)),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        axis.title.y = element_text(size = rel(1)),
+        axis.title.x = element_text(size = rel(1)))
+
+t_s %>%
+  mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
+  ggplot(aes(Pre_Trade_Flow, Trade_Flow)) +
+  geom_point(alpha = .2) +
+  geom_smooth() +
+  xlab("Predicted Trade Flow")+
+  ylab("Actual Trade Flow") +
+  labs(title = "Linear Autoregressive Model") +
+   theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size=rel(1)),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        axis.title.y = element_text(size = rel(1)),
+        axis.title.x = element_text(size = rel(1)))
+
+t-t %>%
+  mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
+  ggplot(aes(Pre_Trade_Flow, Trade_Flow)) +
+  geom_point(alpha = .2) +
+  geom_smooth() +
+  xlab("Predicted Trade Flow")+
+  ylab("Actual Trade Flow") +
+  labs(title = "Random Forest") +
+   theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size=rel(1)),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        axis.title.y = element_text(size = rel(1)),
+        axis.title.x = element_text(size = rel(1)))
+
+t_u <- 
+  mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
+  ggplot(aes(Pre_Trade_Flow, Trade_Flow)) +
+  geom_point(alpha = .2) +
+  geom_smooth() +
+  xlab("Predicted Trade Flow")+
+  ylab("Actual Trade Flow") +
+  labs(title = "K-Nearest Neighbor") +
+   theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size=rel(1)),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        axis.title.y = element_text(size = rel(1)),
+        axis.title.x = element_text(size = rel(1)))
+
+rm(t_r, t_s. t_t, t_u)
+```
+
+### 5.2 Make Prediction on Entire Dataset 
+
+Finally, I use the trained random forest model to make a prediction on entire dataset. The accuracy of the model is reasonable given that the RMSE and MAE are between in-sample error and out-of-sample error of random forest model. The r-squared is as high as 0.89, very close robustness of fit as Circlaeys found with Feedforward Neural Network (0.90). However, this is not to say that random forest is as powerful as neural network, but my analysis proves that it works well with data particularly from 1995 to 2018. The difference of model performances would strictly depends on the structure of dataset.
+
+```{r make prediction on entire data, include=FALSE}
+#Linear prediction
+final_1 <- bind_cols(
+  bake(recipe1, new_data = bitrade),
+  predict(rf_model, bake(recipe1, new_data = bitrade)))
+
+final_r <- final_1 %>%
+  select(FLOW, .pred) %>%
+  mutate(Trade_Flow = exp(FLOW), Pre_Trade_Flow = exp(.pred)) %>%
+  rename(lflow = FLOW)
+write_csv(final_1, "final_1.csv")
+rm(final_1)
+
+kable(final_r %>%
+      metrics(truth = lflow, estimate = .pred) %>% 
+      rename(Metric = .metric, Estimate = .estimate) %>%
+      select(-.estimator), format = "markdown", caption = " Model Performance Overall")
+
+```
+
+A scatter plot of the predicted vs. actual prices shows residuals with a some outliers at the right side, which are not well explained by the model. The predictions are more accurate for country pairs with smaller trade flows relative to those having large bilateral trade flow. Nevertheless, the model shows fairly good level of robustness.
+```{r scatter-plot 2, fig.height=2, fig.width=3, echo=FALSE, warning=FALSE}
+
+final_r %>%
+  mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
+  ggplot(aes(Pre_Trade_Flow, Trade_Flow)) +
+  geom_point(alpha = .2) +
+  geom_smooth() +
+  xlab("Predicted Trade Flow")+
+  ylab("Actual Trade Flow") +
+  labs(title = "Graph 4. Random Forest Model over Entire Data") +
+   theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        legend.box.background = element_blank(),
+        legend.text = element_text(size=rel(1)),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        axis.title.y = element_text(size = rel(1)),
+        axis.title.x = element_text(size = rel(1)))
+```
+
+I further plot the predicted trade flow against the actual trade flow across years. The shapes of curves appear to be consistent, but random forest clearly underestimates the trade flow. Moreover, the gap between actual and predicted trade flows increases over time, so one may expect that the accuracy of random forest decreases if data has larger time spans. This is understandable given random forest prediction does not fit time-series analysis
+```{r performance, echo=FALSE, fig.height=2, fig.width=3, warning=FALSE}
+bitrade$year <- as.numeric(bitrade$year)
+bind_cols(bitrade,final_r) %>%
+  select(year, Trade_Flow, Pre_Trade_Flow) %>%
+  group_by(year) %>%
+  dplyr::summarize(Trade_Flow = mean(Trade_Flow)/1000000, Predicted_Trade_Flow = mean(Pre_Trade_Flow)/1000000) %>%
+  pivot_longer(-year) %>%
+  ggplot(aes(x = year, y = value, color = name, group = name)) +
+      geom_point() +
+      geom_line() +
+      scale_colour_manual(labels=c("Predicted Trade Flow", "Actual Trade Flow"),
+                      values=c("brown",'darkblue')) +
+      xlab("Year")+
+      ylab("Value (million U.S $)")+
+      ggtitle("Graph 5. Yearly Actual V.S Predicted Trade Flow, 1995-2018") +
+      scale_y_continuous(limits = c(0, NA)) +
+      theme(plot.title = element_text(hjust = 0.5),
+        legend.title = element_blank(),
+        legend.box.background = element_blank(),
+        legend.position =  "bottom",
+        legend.text = element_text(size=rel(1)),
+        axis.line = element_line(size = 0.3, colour = "black"),
+        axis.title.y = element_text(size = rel(1)),
+        axis.title.x = element_text(size = rel(1)),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank(),
+        panel.background = element_blank())
+```
+
+##6. Conclusion
+
+The results have shown that using random forest regression is a promising approach in predicting bilateral trade flow when predictions are based on a dataset of short time periods (13 years) but large number of individual units (29930 country pairs in total). With 1000 decision trees involved, the random forest model improves Gravity Model’s prediction performance by the test set R2 score of .14, using the same set of features. The extent of improvement is close to what Circlaeys et al.(2017) found with fully-connected, feed-forward neural network model. As a conclusion, this study also proves higher efficiency of non-linear combinations by ML techniques for bilateral trade prediction.
+
+However, K-Nearest Neighbor model does not seem to work better than linear regression, and there seems to be a huge issue of overfitting without k-fold cross-validation. Since I obtain a smaller in-sample error of KNN relative to other models, conducting k-fold cross-validation may decrease the chance of overfitting. However, there are huge computational costs associated with training KNN model because I used a training dataset of over 300 thousand observations. Conducting k-fold cross-validation exacerbates the computational speeds. Future study needs more advanced computer and software for model training at such scale.
+
+In terms of time-series effects, AR model does not seem to greatly outperform linear Gravity Model. This might be due to the fact that there are no significant time-series effects within short time range that can be exploited by lagged values. Nevertheless, the finding offsets the fact that random forest does not work for time-series prediction, because time-series prediction is not necessary for this dataset. In addition, I also regard random forest as a more practical approach compared to KNN in general prediction because the model is computationally much easier.
+
+For future study, it is worthwhile to apply feedforward neural network regression just as Circlaeys et al.(2017). Training and testing neural network on R with over 480 thousand datasets have real computational difficulties, which impeded this project to make more progress. The work may be better done with Python and Cloud Service, and given large sample size, it can be time-consuming to complete such scale of project. Nevertheless, neural network regression has been applied to major economic analysis, thus being valuable for examination.
+
+##7. Reference
+
+[1] K. Mahfuz, S. Ruhu, A. M. Nasser. “The Gravity Model and Trade Flows: Recent Developments in Econometric Modeling and Empirical Evidence.”, Economic Analysis and Policy, vol. 56,, pp. 60–71, 2017.
+
+[2] J. E. Anderson, “The Gravity Model”, Annual Review of Economics, vol.3, pp.133-160, 2011.
+
+[3] J. Sun, Y. Suo, S. Park, T. Xu, Y. Liu, W. Wang, “Analysis of Bilateral Trade Flow and Machine Learning Algorithms for GDP Forecasting ”, Engineering, Technology & Applied Science Research, Vol. 8, No. 5, pp. 3432-3438, 2018.
+
+[4] F.A. Batarseh, M. Gopinath, G.Nalluru and J. Beckman. "Application of Machine Learning in Forecasting International Trade Trends", available at: https://arxiv.org/pdf/1910.03112.pdf
+
+[5] S. Circlaeys, C. Kanitkar, and D. Kumazawa, “Bilateral Trade Flow Prediction”, available at: http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf, 2017 
+
+[6] M. Fouquin and J. Hugot, “Two centuries of bilateral trade and gravity data: 1827-2014.” CEPII Working Paper, 2016.
+
+[7] P Cotterlaz "International Trade Database at the Product-Level. The 1994-2007 Version: January 2020 BACI update - Release Notes" CEPII Working Paper, 2010.
+
+[8] "World Development Indicators: GDP (current US$)" The World Bank Group, available at: https://data.worldbank.org/indicator/NY.GDP.MKTP.CD, 2019
+
+[9] "World Bank National Account Data: Inflation, GDP deflator (annual %)" The World Bank Group, available at: https://data.worldbank.org/indicator/NY.GDP.DEFL.KD.ZG, 2019
+
+[10] T. Mayer and S. Zignago, "Notes on CEPII’s distances measures : the GeoDist Database." CEPII Working Paper, 2011.
+
+[11] "United Nations Population Division. World Population Prospects: Total Population" World Bank Database, available at: https://data.worldbank.org/indicator/sp.pop.totl, 2019
