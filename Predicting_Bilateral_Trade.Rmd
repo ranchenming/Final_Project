@@ -285,7 +285,7 @@ Meanwhile, I removed observations that involve both South Sudan and Sudan becaus
 ### 2.4 Summary of Dataset
 
 By removing troublesome observations, I obtain a dataset containing 488866 data points from the 1995 to 2018 for 226 different countries and territories (29930 country pairs in total). Our data set has both geographical dimension (country-pairs, such as USA to China, France to Germany, etc.) and time dimension. 
-```{r data, include=FALSE}
+```{r data, echo=TRUE}
 new_bitrade <- read_dta("new_bitrade.dta")
 bitrade <- new_bitrade  %>%
   filter(!is.na(GDP_o),!is.na(GDP_d), !is.na(distw), iso_o != "SDN", iso_d != "SDN") %>% #Sudan and South Sudan has conflicted iso and country code so I eliminate for my analysis (494420-488866 = 55540 observations related to Sudan and South Sudan, which is comparatively small to my sample)
@@ -327,7 +327,8 @@ Similar to Circlaey et al.(2017), I also compare the performance of time series 
 
 #### 3.2.1 Stationarity
 
-For testing stationarity, Augmented Dickey-Fuller Test (ADF test) and Kwiatkowski–Phillips–Schmidt–Shin (KPSS test) are used to test if the data is stationary. For both tests, a p-Value of less than 0.05 indicates that the bilateral trade flow is stationary. It is appropriate for empirical analysis to take into account time-series effect
+For testing stationarity, Augmented Dickey-Fuller Test (ADF test) and Kwiatkowski–Phillips–Schmidt–Shin (KPSS test) are used to test if the data is stationary. For both tests, a p-Value of less than 0.05 indicates that the bilateral trade flow is stationary. It is appropriate for empirical analysis to take into account time-series effect.
+
 ```{r stationary, echo=FALSE}
 adf.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
 kpss.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
@@ -336,6 +337,7 @@ kpss.test(bitrade$FLOW) # p-value < 0.05 indicates the TS is stationary
 #### 3.2.2 Autocorrelation and Partial-Autocorrelation
 
 The autocorrelation shows that significant correlations are at the first lag, followed by correlations that are not significant. Thus, there are modest time-series effects to address that one year lag of dependent variable is good for prediction.
+
 ```{r PA, echo=FALSE, fig.align="center", message=FALSE, warning=FALSE}
 library(Hmisc)
 acfRes <- acf(bitrade$FLOW, plot = FALSE) # autocorrelation
@@ -384,7 +386,7 @@ bit_testing <- testing(split)
 
 The distributions of trade flow, GDP, population and weighted distance are approximately normal, which is shown in the graph below. To note K-Nearest Neighbors do not assume normal distribution and CART model does not assume relationship in advance, continuous variables are still transformed into logarithsm, in order to test whether the efficiency of addressing non-linearity improves from logarithm transformation to advanced algorithsm.
 
-```{r histogram, fig.align="center",echo=FALSE, message=FALSE, warning=FALSE}
+```{r histogram, echo=FALSE, fig.align="center", message=FALSE, warning=FALSE}
 par(mfrow=c(2,3))
 hist(log(bitrade$FLOW),
      main="Bilateral Trade Flow",
@@ -484,7 +486,7 @@ recipe3 <-
 
 ## 5. Model Training and Estimation 
 
-Accordingly, I trained 4 different models discussed above, with 3 different recipes addressing major model assumptions. For estimating KNN model, I follow the conventional determination of k and choose the value to be 588, which is the square root of sample number in my training dataset.
+Accordingly, I trained 4 different models discussed above, with 3 different recipes addressing major model assumptions. For estimating KNN model, I follow the conventional determination of k and choose the value to be 588, which is the square root of sample number in my training dataset. I train random forest model with 1000 trees that are large enough to suit my dataset.
 
 ```{bash eval=FALSE}
 # train Gravity model 
@@ -587,6 +589,7 @@ write_csv(Metric4, "Metric4.csv")
 Among all models, the random forest model has the best performance over training and test datasets. According to the Table 1 below, most in-sample and out-of-sample errors are close for each model except for the random forest model and KNN model. This means a hold-out validation using 30% of the entire dataset is fairly efficient. The reason is that my updated dataset does not have as large sample as Circlaeys' study. A k-fold cross validation should decrease the chance of overfitting.
 
 Nevertheless, conducting k-fold cross validation has huge computational costs for training KNN and Random forest models. Especially with over 300 thousand data, parsing a sample of data into complementary subsets and performing on training data further slows the speed of KNN algorithm. Since computational cost is a real equipment issue that cannot be solved with R. Therefore, I insists hold-out validation as Circlaeys' et al.(2017) did, assuming my dataset is sufficiently large relative to other small datasets.
+
 ```{r print the out-of-sample errors, echo=FALSE, warning=FALSE}
 Metrics_com <- read_csv("Metrics_com.csv")
 
@@ -693,6 +696,7 @@ knitr::kable(final_r %>%
 ```
 
 A scatter plot of the predicted vs. actual prices shows residuals with a some outliers at the right side, which are not well explained by the model. Nevertheless, the model shows fairly good level of robustness. Except for country pairs that are highly trade dependent, the prediction is accurate for majority of bilateral trade flows.
+
 ```{r scatter-plot 2, fig.align="center", echo=FALSE, warning=FALSE}
 final_r %>%
   mutate(Pre_Trade_Flow = Pre_Trade_Flow/10000000, Trade_Flow =Trade_Flow/10000000) %>%
@@ -712,7 +716,8 @@ final_r %>%
 ```
 
 I further plot the predicted trade flow against the actual trade flow across years. The shapes of curves appear to be consistent, but random forest clearly underestimates the trade flow. Moreover, the gap between actual and predicted trade flows increases over time, so one may expect that the accuracy of random forest decreases if data has larger time spans. This is understandable given random forest prediction does not fit time-series analysis.
-```{r performance, echo=FALSE, warning=FALSE}
+
+```{r performance, fig.align="center", echo=FALSE, warning=FALSE}
 bitrade$year <- as.numeric(bitrade$year)
 bind_cols(bitrade,final_r) %>%
   select(year, Trade_Flow, Pre_Trade_Flow) %>%
