@@ -91,7 +91,7 @@ path_2 = file.path("BAC/BAC2/",file_2)
 BAC_2 <- Reduce(rbind, lapply(path_2, read.csv))
 ```
 
-```{r trade3, echo=TRUE, eval=FALSE}
+```{r trade4, echo=TRUE, eval=FALSE}
 BAC_complete_2 <- BAC_2 %>%
   filter(t,i,j,v) %>%
   group_by(t,i,j) %>%
@@ -119,7 +119,7 @@ rm(BAC_complete_1,BAC_complete_2)
 ```
 
 The the complete bilateral trade dataframe are merged with country codes for trade orgin and destination countries, which prepares later merges of GDP, population and other varibales.
-```{r trade4, echo=TRUE, eval=FALSE}
+```{r trade5, echo=TRUE, eval=FALSE}
 Country <- read_csv("BAC/country_codes_V201901.csv") %>%
   select(CountryCode, iso3) %>%
   rename("country_code_o" = "CountryCode", "iso_o" = "iso3") %>%
@@ -133,7 +133,7 @@ Country_2 <- Country %>%
 
 ```
 
-```{bash eval=FALSE}
+```{r trade6, echo=TRUE, eval=FALSE}
 Trade_1 <- left_join(x = BAC_complete,
                          y = Country_1,
                          by = "country_code_o") 
@@ -208,7 +208,7 @@ rm(pop)
 ```
 
 Then together I creates a complete panel dataset of bilateral trade value, real GDP and population "New_Trade_Data" by merging those dataframes all together.
-```{r pop2, echo=TRUEeval=FALSE}
+```{r pop2, echo=TRUE, eval=FALSE}
 Trade$year = as.character(Trade$year)
 GDP_up1<- left_join(x = Trade,y = GDP_1, by = c("year","iso_o")) 
 
@@ -238,7 +238,7 @@ The time-invariant indicators from "Tradehist" database also include controls li
 #### 2.2.5 Time Invariant Controls
 OECD member and GATT member were also used as controls by Circlaeys et al.(2017), and they are avilable as country time-invariant variables in the "Tradehist" database [6]. To note, the status of OECD and GATT is not completely time-invariant because countries joined OECD and WTO in different years. The two organizations also have new membership from 2014 to 2018, which I updated by hand in the excel sheet beforehand.
 
-```{r time-invariant, echo=TRUE eval=FALSE}
+```{r time-invariant, echo=TRUE, eval=FALSE}
 library(readxl)
 binvar <- read_stata ("GeoDist.dta") %>%
   select(iso_o, iso_d, distw, comlang_ethno, contig)  %>%
@@ -619,9 +619,9 @@ write_csv(Metrics_com, "Metrics_com.csv")
 rm(split, bit_training)
 rm(Metrics_p, Metrics_d, Metrics_e, Metric1, Metric2, Metric3, Metric4, M)
 ```
-Although the out-of-sample error for random forest model notably outweights the in-sample error, the model performance is still superior to linear regression models and KNN models. Meanwhile, Not addressing time-series features does not incur significant prediction bias. Since AR model was only able to improve linear gravity model by a small amount, there is not much time effects that can be exploited when predicting trade flows based on the past values. The reason may be a small time spans relative to a large number of country pairs, so seriel dependence of bilateral trade flow is very trivial. Therefore, the random forest model dose work well enough to predict bilateral trade flow.
+the model performance is still superior to linear regression models and KNN models. Meanwhile, Not addressing time-series features does not incur significant prediction bias. Since AR model was only able to improve linear gravity model by a small amount, there is not much time effects that can be exploited when predicting trade flows based on the past values. The reason may be a small time spans relative to a large number of country pairs, so seriel dependence of bilateral trade flow is very trivial. Therefore, the random forest model dose work well enough to predict bilateral trade flow.
 
-As for the first KNN model, there are large increase in RMSE and MAE and decrease in R-squared when predicting values in testing dataset, which means the extent of overfitting is large. Thus, The KNN model is not likely to be more effective than linear regression model. I recognize a 10 fold cross-validation may increase the accuracy of KNN, but the random forest certainly performs much better among alll mondels. Below are scatter plots that demonstrate the goodness of fit for each model.
+As for the KNN model, there are large increase in RMSE and MAE and decrease in R-squared when predicting values in testing dataset, which means the extent of overfitting is large. Thus, the KNN model is not likely to be more effective than linear regression model. I recognize a 10 fold cross-validation may increase the accuracy of KNN, but the random forest certainly performs the best among alll mondels. Below are scatter plots that demonstrate the goodness of fit for each model on testing data.
 ```{r scatter test, include=FALSE}
 t_1 <- bind_cols(
   bake(recipe1, new_data = bit_testing),
