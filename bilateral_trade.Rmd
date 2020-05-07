@@ -184,7 +184,6 @@ rm(GDP_update, GDP_s)
 #### 2.2.3 Population
 
 Population is a control variable commonly  used by Circlaeys et al (2017). Therefore, this study also incorportations country total population data from United Nations Population Division  — World Population Prospect from 1995 to 2018 [10]. I create pop_1 as a subset to match with trade origin countries, and pop_2 to match with trade destination countries. 
-
 ```{r pop, echo=TRUE, eval=FALSE}
 pop <- read_excel("population.xlsx")  %>%
   mutate_all(as.character) %>%
