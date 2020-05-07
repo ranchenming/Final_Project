@@ -396,7 +396,7 @@ summary {
 <p>Nevertheless, the “Tradehist”data is only available up to the year 2014. In order to investigate more recent trend of bilateral trade flow, I recreate key indicators of “Tradehist” database from other more updated database from CEPII.</p>
 <div id="trade-flow" class="section level4">
 <h4>2.2.1 Trade Flow</h4>
-<p>Other than “Tradehist”, BACI&quot; is the major bilateral trade database provided by CEPII [7]. This database provides yearly data on bilateral trade flows at the product level. Products are identified using the Harmonized System (HS), a standard nomenclature for international trade, Ths HS was revised in 1992, 1996, 2002, 2007, 2012 and 2017. For this study, I use HS92 version that has data vailable from 1995 to 2018, the bilateral trade value is obtained by collapsing trade flow for each country pair and year.</p>
+<p>Other than “Tradehist”, “BACI” is the major bilateral trade database provided by CEPII [7]. This database provides yearly data on bilateral trade flows at the product level. Products are identified using the Harmonized System (HS), a standard nomenclature for international trade, Ths HS was revised in 1992, 1996, 2002, 2007, 2012 and 2017. For this study, I use HS92 version that has data vailable from 1995 to 2018, the bilateral trade value is obtained by collapsing trade flow for each country pair and year.</p>
 <p>Due to the extremely large data volume, I first append all HS92 country data from 1995 to 2007.</p>
 <pre class="bash"><code>#link to the seperate files of yearly data
 filenames &lt;- list.files(path=&quot;BAC/BAC1&quot;,pattern=&quot;*.csv&quot;)
@@ -853,10 +853,10 @@ write_csv(Metric4, &quot;Metric4.csv&quot;)</code></pre>
 <p>[1] K. Mahfuz, S. Ruhu, A. M. Nasser. “The Gravity Model and Trade Flows: Recent Developments in Econometric Modeling and Empirical Evidence.”, Economic Analysis and Policy, vol. 56,, pp. 60–71, 2017.</p>
 <p>[2] J. E. Anderson, “The Gravity Model”, Annual Review of Economics, vol.3, pp.133-160, 2011.</p>
 <p>[3] J. Sun, Y. Suo, S. Park, T. Xu, Y. Liu, W. Wang, “Analysis of Bilateral Trade Flow and Machine Learning Algorithms for GDP Forecasting”, Engineering, Technology &amp; Applied Science Research, Vol. 8, No. 5, pp. 3432-3438, 2018.</p>
-<p>[4] F.A. Batarseh, M. Gopinath, G.Nalluru and J. Beckman. “Application of Machine Learning in Forecasting International Trade Trends”, available at: <a href="https://arxiv.org/pdf/1910.03112.pdf" class="uri">https://arxiv.org/pdf/1910.03112.pdf</a></p>
+<p>[4] F. A. Batarseh, M. Gopinath, G.Nalluru and J. Beckman. “Application of Machine Learning in Forecasting International Trade Trends”, available at: <a href="https://arxiv.org/pdf/1910.03112.pdf" class="uri">https://arxiv.org/pdf/1910.03112.pdf</a></p>
 <p>[5] S. Circlaeys, C. Kanitkar, and D. Kumazawa, “Bilateral Trade Flow Prediction”, available at: <a href="http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf" class="uri">http://cs229.stanford.edu/proj2017/finalreports/5240224.pdf</a>, 2017</p>
 <p>[6] M. Fouquin and J. Hugot, “Two centuries of bilateral trade and gravity data: 1827-2014.” CEPII Working Paper, 2016.</p>
-<p>[7] P Cotterlaz “International Trade Database at the Product-Level. The 1994-2007 Version: January 2020 BACI update - Release Notes” CEPII Working Paper, 2010.</p>
+<p>[7] P. Cotterlaz “International Trade Database at the Product-Level. The 1994-2007 Version: January 2020 BACI update - Release Notes” CEPII Working Paper, 2010.</p>
 <p>[8] “World Development Indicators: GDP (current US$)” The World Bank Group, available at: <a href="https://data.worldbank.org/indicator/NY.GDP.MKTP.CD" class="uri">https://data.worldbank.org/indicator/NY.GDP.MKTP.CD</a>, 2019</p>
 <p>[9] “World Bank National Account Data: Inflation, GDP deflator (annual %)” The World Bank Group, available at: <a href="https://data.worldbank.org/indicator/NY.GDP.DEFL.KD.ZG" class="uri">https://data.worldbank.org/indicator/NY.GDP.DEFL.KD.ZG</a>, 2019</p>
 <p>[10] T. Mayer and S. Zignago, “Notes on CEPII’s distances measures : the GeoDist Database.” CEPII Working Paper, 2011.</p>
